@@ -22,21 +22,33 @@ slSocket.on('connect', () => {
 // 3. Auf Events von Streamlabs reagieren
 slSocket.on('event', (eventData) => {
     // Streamlabs sendet verschiedene Events (donations, subs, bits)
-    console.log(eventData);
-    if (eventData.for === 'twitch_account') {
-        switch (eventData.type) {
-            case 'subscription':
-                // code to handle subscription events
-                console.log(eventData.message);
-                break;
-            case 'bits':
-                // code to handle bits events
-                console.log(eventData.message);
-                break;
-            default:
-                // default case
-                console.log(eventData.message);
-        }
+    switch (eventData.type) {
+        case 'subscription':
+            switch (eventData.message[0].type) {
+                case 'resub':
+                    // code to handle subscription events
+                    console.log(`Neuer Resub von ${eventData.message[0].name} für ${eventData.message[0].months} Monate!`);
+                    break;
+                case 'subgift':
+                    // code to handle bits events
+                    console.log(`${eventData.message[0].gifter} hat ein Sub an ${eventData.message[0].name} verschenkt!`);
+                    break;
+                default:
+                    // default case
+                    console.log(eventData.message[0]);
+                    break;
+            }
+            break;
+        case 'bits':
+            console.log(`Bits erhalten: ${eventData.message[0].amount} von ${eventData.message[0].name}`);
+            break;
+        case 'subMysteryGift':
+            console.log(`Sub-Bombe: ${eventData.message[0].amount} von ${eventData.message[0].name}`);
+            break;
+        default:
+            // Andere Event-Typen können hier behandelt werden
+            console.log(eventData);
+            break;
     }
 });
 
