@@ -3,9 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Subathon-Timer für Twitch</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    
+    <div id="app-shell">
+        <button id="settingsBtn" class="icon-btn" type="button" aria-label="Einstellungen öffnen" aria-controls="settingsOverlay" aria-expanded="false">⚙</button>
+
+        <div id="settingsOverlay" class="overlay hidden" aria-hidden="true">
+            <button id="closeSettingsBtn" class="icon-btn small" type="button" aria-label="Einstellungen schließen">✕</button>
+            <div id="settingsPanel" class="overlay-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+                <div class="overlay-header">
+                    <h2 id="settingsTitle">Einstellungen</h2>
+                </div>
+
+                <section class="settings-section" aria-label="Zeitaddierung">
+                    <h3>Zeitaddierung</h3>
+                    <div class="settings-grid four-cols">
+                        <label class="field-item" for="settingBits">
+                            <span>Bits</span>
+                            <input id="settingBits" type="number" min="0" step="1" placeholder="Sekunden" inputmode="numeric" pattern="[0-9]*">
+                        </label>
+                        <label class="field-item" for="settingPrimeT1">
+                            <span>Prime/T1</span>
+                            <input id="settingPrimeT1" type="number" min="0" step="1" placeholder="Sekunden" inputmode="numeric" pattern="[0-9]*">
+                        </label>
+                        <label class="field-item" for="settingT2">
+                            <span>T2</span>
+                            <input id="settingT2" type="number" min="0" step="1" placeholder="Sekunden" inputmode="numeric" pattern="[0-9]*">
+                        </label>
+                        <label class="field-item" for="settingT3">
+                            <span>T3</span>
+                            <input id="settingT3" type="number" min="0" step="1" placeholder="Sekunden" inputmode="numeric" pattern="[0-9]*">
+                        </label>
+                    </div>
+                </section>
+
+                <section class="settings-section" aria-label="Sub-Bomben">
+                    <h3>Sub-Bomben</h3>
+                    <div class="settings-grid four-cols">
+                        <label class="field-item" for="settingBomb10">
+                            <span>10</span>
+                            <input id="settingBomb10" type="number" min="0" step="1" placeholder="Sekunden" inputmode="numeric" pattern="[0-9]*">
+                        </label>
+                        <label class="field-item" for="settingBomb20">
+                            <span>20</span>
+                            <input id="settingBomb20" type="number" min="0" step="1" placeholder="Sekunden" inputmode="numeric" pattern="[0-9]*">
+                        </label>
+                        <label class="field-item" for="settingBomb50">
+                            <span>50</span>
+                            <input id="settingBomb50" type="number" min="0" step="1" placeholder="Sekunden" inputmode="numeric" pattern="[0-9]*">
+                        </label>
+                        <label class="field-item" for="settingBomb100">
+                            <span>100</span>
+                            <input id="settingBomb100" type="number" min="0" step="1" placeholder="Sekunden" inputmode="numeric" pattern="[0-9]*">
+                        </label>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <div id="container">
+            <h1>Subathon Timer</h1>
+
+            <div id="status-row">
+                <span id="connection-status" class="badge offline">Offline</span>
+                <span id="run-status" class="badge paused">Pausiert</span>
+            </div>
+
+            <div id="timer-wrap">
+                <div id="timer" title="Im pausierten Zustand klicken zum Bearbeiten">0:00:00</div>
+                <input id="timerInput" type="text" inputmode="numeric" placeholder="000:00:00" maxlength="10" aria-label="Timer setzen im Format 000:00:00">
+            </div>
+
+            <div id="stats">
+                <div id="stats-lines">
+                    <p>Subs gesamt: <strong id="subs">0</strong></p>
+                    <p>Bits gesamt: <strong id="bits">0</strong></p>
+                    <p>+Zeit je Sub: <strong id="seconds-per-sub">300s</strong></p>
+                </div>
+                <button id="happyHourBtn" type="button" aria-pressed="false" title="Happy Hour umschalten">
+                    <span>Happy</span>
+                    <span>Hour</span>
+                </button>
+            </div>
+
+            <div id="controls">
+                <button id="startBtn" type="button">Start</button>
+                <button id="pauseBtn" type="button">Pause</button>
+                <button id="resetBtn" type="button">Reset</button>
+                <button id="addSubBtn" type="button">+1 Sub (Test)</button>
+            </div>
+
+            <p id="hint">Backend starten, dann werden Streamlabs-Events automatisch verarbeitet.</p>
+        </div>
+    </div>
+
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
