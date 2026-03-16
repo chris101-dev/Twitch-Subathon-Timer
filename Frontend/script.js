@@ -1,19 +1,20 @@
-const DEFAULT_SECONDS_PER_SUB = 300;
+const DEFAULT_SECONDS_PER_SUB = 600;
 
 const timerElement = document.getElementById('timer');
 const timerWrap = document.getElementById('timer-wrap');
 const timerInput = document.getElementById('timerInput');
 const subsElement = document.getElementById('subs');
 const bitsElement = document.getElementById('bits');
+const subBombsElement = document.getElementById('sub-bombs');
 const secondsPerSubElement = document.getElementById('seconds-per-sub');
 const happyHourBtn = document.getElementById('happyHourBtn');
 const connectionStatus = document.getElementById('connection-status');
+const streamlabsStatus = document.getElementById('streamlabs-status');
 const runStatus = document.getElementById('run-status');
 
-const startBtn = document.getElementById('startBtn');
-const pauseBtn = document.getElementById('pauseBtn');
+const runToggleBtn = document.getElementById('runToggleBtn');
+const manualTimeAddInput = document.getElementById('manualTimeAddInput');
 const resetBtn = document.getElementById('resetBtn');
-const addSubBtn = document.getElementById('addSubBtn');
 const settingsBtn = document.getElementById('settingsBtn');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const settingsOverlay = document.getElementById('settingsOverlay');
@@ -35,16 +36,18 @@ let state = {
     isRunning: false,
     subs: 0,
     bits: 0,
+    subBombs: 0,
+    streamlabsConnected: false,
     happyHour: false,
     eventSeconds: {
-        bits: 0,
+        bits: 120,
         primeT1: DEFAULT_SECONDS_PER_SUB,
-        t2: DEFAULT_SECONDS_PER_SUB,
-        t3: DEFAULT_SECONDS_PER_SUB,
-        bomb10: 0,
-        bomb20: 0,
-        bomb50: 0,
-        bomb100: 0
+        t2: 900,
+        t3: 1800,
+        bomb10: 1800,
+        bomb20: 3600,
+        bomb50: 7200,
+        bomb100: 14400
     },
     stateVersion: 0,
     secondsPerSub: DEFAULT_SECONDS_PER_SUB
@@ -111,6 +114,42 @@ function parseTimerInput(value) {
     return (hours * 3600) + (minutes * 60) + seconds;
 }
 
+function maskManualAddInputFromDigits(rawValue) {
+    const digits = rawValue.replace(/\D/g, '').slice(0, 5);
+    if (digits.length === 0) {
+        return '';
+    }
+
+    let masked = digits.slice(0, 1);
+
+    if (digits.length > 1) {
+        masked += `:${digits.slice(1, Math.min(3, digits.length))}`;
+    }
+
+    if (digits.length > 3) {
+        masked += `:${digits.slice(3, 5)}`;
+    }
+
+    return masked;
+}
+
+function parseManualAddInput(value) {
+    const match = /^(\d):(\d{2}):(\d{2})$/.exec(value.trim());
+    if (!match) {
+        return null;
+    }
+
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const seconds = Number(match[3]);
+
+    if (minutes > 59 || seconds > 59) {
+        return null;
+    }
+
+    return (hours * 3600) + (minutes * 60) + seconds;
+}
+
 function setTimerEditing(isEditing) {
     isTimerEditing = isEditing;
     timerWrap.classList.toggle('editing', isEditing);
@@ -160,9 +199,13 @@ function render(nextState) {
     timerElement.textContent = formatTime(state.remainingSeconds);
     subsElement.textContent = String(state.subs);
     bitsElement.textContent = String(state.bits);
+    subBombsElement.textContent = String(state.subBombs);
     secondsPerSubElement.textContent = `${state.eventSeconds.primeT1}s`;
     happyHourBtn.classList.toggle('on', Boolean(state.happyHour));
     happyHourBtn.setAttribute('aria-pressed', String(Boolean(state.happyHour)));
+    streamlabsStatus.classList.toggle('online', Boolean(state.streamlabsConnected));
+    streamlabsStatus.classList.toggle('offline', !state.streamlabsConnected);
+    runToggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
     updateRunStatus(state.isRunning);
     timerElement.classList.toggle('editable', !state.isRunning);
     syncSettingsInputs();
@@ -288,7 +331,7 @@ const canUseSocket = typeof window.io === 'function';
 let socket = null;
 
 if (canUseSocket) {
-    socket = window.io('http://localhost:3000');
+    socket = window.io();
 
     socket.on('connect', () => {
         setConnectionBadge(true);
@@ -307,24 +350,72 @@ if (canUseSocket) {
     setConnectionBadge(false);
 }
 
-startBtn.addEventListener('click', () => {
-    socket?.emit('timer-control', { action: 'start' });
-});
+runToggleBtn.addEventListener('click', () => {
+    const nextAction = state.isRunning ? 'pause' : 'start';
+    socket?.emit('timer-control', { action: nextAction });
 
-pauseBtn.addEventListener('click', () => {
-    socket?.emit('timer-control', { action: 'pause' });
+    if (!socket) {
+        render({ isRunning: !state.isRunning });
+    }
 });
 
 resetBtn.addEventListener('click', () => {
+    const confirmed = window.confirm('Moechtest du wirklich alles zuruecksetzen? Timer, Subs, Bits, Sub-Bombs und Happy Hour werden zurueckgesetzt.');
+    if (!confirmed) {
+        return;
+    }
+
     socket?.emit('timer-control', { action: 'reset' });
+
+    if (!socket) {
+        render({
+            isRunning: false,
+            remainingSeconds: 0,
+            subs: 0,
+            bits: 0,
+            subBombs: 0,
+            happyHour: false
+        });
+    }
 });
 
-addSubBtn.addEventListener('click', () => {
+manualTimeAddInput.addEventListener('input', () => {
+    manualTimeAddInput.value = maskManualAddInputFromDigits(manualTimeAddInput.value);
+    manualTimeAddInput.classList.remove('input-error');
+});
+
+function setManualAddInputError() {
+    manualTimeAddInput.classList.add('input-error');
+    manualTimeAddInput.value = '';
+    manualTimeAddInput.focus();
+}
+
+function submitManualAddTime() {
+    const parsedSeconds = parseManualAddInput(manualTimeAddInput.value);
+    if (parsedSeconds === null || parsedSeconds <= 0) {
+        setManualAddInputError();
+        return;
+    }
+
+    manualTimeAddInput.classList.remove('input-error');
+
     socket?.emit('manual-adjust', {
-        reason: 'manual-test-sub',
-        addSeconds: state.eventSeconds.primeT1,
-        addSubs: 1
+        reason: 'manual-time-add',
+        addSeconds: parsedSeconds
     });
+
+    if (!socket) {
+        render({ remainingSeconds: state.remainingSeconds + parsedSeconds });
+    }
+
+    manualTimeAddInput.value = '';
+}
+
+manualTimeAddInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        submitManualAddTime();
+    }
 });
 
 happyHourBtn.addEventListener('click', () => {
