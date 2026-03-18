@@ -1,9 +1,9 @@
 {
-  "remainingSeconds": 6809,
+  "remainingSeconds": 8671,
   "isRunning": false,
-  "subs": 0,
-  "bits": 0,
-  "subBombs": 0,
+  "subs": 32,
+  "bits": 1070,
+  "subBombs": 3,
   "streamlabsConnected": true,
   "happyHour": false,
   "eventSeconds": {
@@ -17,6 +17,6 @@
     "bomb100": 14400
   },
   "secondsPerSub": 600,
-  "stateVersion": 1646,
-  "updatedAt": 1773671904965
+  "stateVersion": 32872,
+  "updatedAt": 1773769733179
 }

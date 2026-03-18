@@ -25,6 +25,7 @@ const DEFAULT_EVENT_SECONDS = {
     bomb100: DEFAULT_BOMB100_SECONDS
 };
 const EVENT_SECONDS_KEYS = Object.keys(DEFAULT_EVENT_SECONDS);
+const HAPPY_HOUR_MULTIPLIED_CATEGORIES = new Set(['bits', 'primeT1', 't2', 't3']);
 const DEDUPE_ID_TTL_MS = 24 * 60 * 60 * 1000;
 const DEDUPE_FINGERPRINT_TTL_MS = 15 * 1000;
 const DEDUPE_CLEANUP_MS = 60 * 1000;
@@ -500,11 +501,15 @@ function getTierCategory(message) {
     return 'primeT1';
 }
 
-function getSecondsForCategory(category) {
+function getSecondsForCategory(category, { applyHappyHour = true } = {}) {
     const value = timerState.eventSeconds?.[category];
     const baseSeconds = Math.max(0, Math.floor(toNumber(value, 0)));
-    const multiplier = timerState.happyHour ? 2 : 1;
-    return baseSeconds * multiplier;
+
+    if (!applyHappyHour || !timerState.happyHour || !HAPPY_HOUR_MULTIPLIED_CATEGORIES.has(category)) {
+        return baseSeconds;
+    }
+
+    return baseSeconds * 2;
 }
 
 function getBombCategory(amount) {
@@ -524,6 +529,21 @@ function getBombCategory(amount) {
     }
 
     return null;
+}
+
+function extractFollowName(eventData) {
+    const message = eventData?.message?.[0] ?? {};
+
+    return firstNonEmptyString([
+        message?.display_name,
+        message?.displayName,
+        message?.name,
+        message?.username,
+        message?.user_name,
+        message?.follower,
+        eventData?.for,
+        eventData?.name
+    ]) || 'unknown';
 }
 
 function normalizeSettingKey(value) {
@@ -630,14 +650,15 @@ function mapStreamlabsEvent(eventData) {
         if (subType === 'community_gift') {
             const giftCount = Math.max(1, toNumber(message.repeat, 1));
             const bombCategory = getBombCategory(giftCount);
-            const bombSeconds = bombCategory ? getSecondsForCategory(bombCategory) : 0;
+            const bombSeconds = bombCategory ? getSecondsForCategory(bombCategory, { applyHappyHour: false }) : 0;
             const totalSubSeconds = tierSeconds * giftCount;
+            const bombCountIncrement = bombCategory ? 1 : 0;
             rememberMysteryGift(message?.gifter ?? message?.name, giftCount);
 
             return {
                 addSeconds: totalSubSeconds + bombSeconds,
                 addSubs: giftCount,
-                addSubBombs: 1,
+                addSubBombs: bombCountIncrement,
                 reason: bombCategory ? `community_gift:${tierCategory}+${bombCategory}` : `community_gift:${tierCategory}`,
                 debug: {
                     eventLabel: bombCategory ? `subscription:community_gift:${tierCategory}+${bombCategory}` : `subscription:community_gift:${tierCategory}`,
@@ -654,14 +675,15 @@ function mapStreamlabsEvent(eventData) {
         const tierCategory = getTierCategory(message);
         const tierSeconds = getSecondsForCategory(tierCategory);
         const bombCategory = getBombCategory(amount);
-        const bombSeconds = bombCategory ? getSecondsForCategory(bombCategory) : 0;
+        const bombSeconds = bombCategory ? getSecondsForCategory(bombCategory, { applyHappyHour: false }) : 0;
         const totalSubSeconds = tierSeconds * amount;
+        const bombCountIncrement = bombCategory ? 1 : 0;
         rememberMysteryGift(message?.gifter ?? message?.name, amount);
 
         return {
             addSeconds: totalSubSeconds + bombSeconds,
             addSubs: amount,
-            addSubBombs: 1,
+            addSubBombs: bombCountIncrement,
             reason: bombCategory ? `subMysteryGift:${tierCategory}+${bombCategory}` : `subMysteryGift:${tierCategory}`,
             debug: {
                 eventLabel: bombCategory ? `subMysteryGift:${tierCategory}+${bombCategory}` : `subMysteryGift:${tierCategory}`,
@@ -714,7 +736,12 @@ if (slSocket) {
             return;
         }
 
-        logEventLine('STREAMLABS', { status: 'ack_unmapped', type: eventType, subType });
+        if (eventType === 'follow') {
+            logEventLine('FOLLOW', {
+                event: 'follow',
+                user: extractFollowName(eventData)
+            });
+        }
     });
 }
 
